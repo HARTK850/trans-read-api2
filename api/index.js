@@ -37,7 +37,7 @@ class YemotCommandBuilder {
 
     cleanYemotText(text) {
         if (!text) return "";
-        // מחיקת תווים בעייתיים העלולים לשבור את מפרידי המחרוזות של ימות המשיח
+        // מחיקת תווים בעייתיים אך שמירה על סוגריים עגולות לצורך הוראות ה-AI
         return text.toString().replace(/[.,-]/g, " ").replace(/\s+/g, " ").trim();
     }
 
@@ -278,7 +278,7 @@ module.exports = async (req, res) => {
                 if (!isAdmin) {
                     // מאזין רגיל: עובר ישר לג'נרציה עם קול ברירת מחדל (Schedar)
                     const defaultVoiceId = "Schedar";
-                    const monotonicInstruction = `Say monotonically, neutrally, flatly and slightly fast: ${transcribedText}`;
+                    const monotonicInstruction = `slightly fast: ${transcribedText}`;
                     const ttsBuffer = await gemini.generateSpeech(monotonicInstruction, defaultVoiceId);
                     
                     const tempTtsWavPath = `ivr2:${TEMP_FOLDER}/${ApiCallId}_listener_tts.wav`;
@@ -313,7 +313,7 @@ module.exports = async (req, res) => {
                     if (voiceChoice === "1") {
                         // קול ברירת מחדל מנהל
                         const defaultVoiceId = "Schedar";
-                        const monotonicInstruction = `Say monotonically, neutrally, flatly and slightly fast: ${savedText}`;
+                        const monotonicInstruction = `slightly fast: ${savedText}`;
                         const ttsBuffer = await gemini.generateSpeech(monotonicInstruction, defaultVoiceId);
                         
                         await yemot.uploadFile(`ivr2:${TEMP_FOLDER}/${ApiCallId}_listener_tts.wav`, ttsBuffer);
@@ -480,7 +480,7 @@ module.exports = async (req, res) => {
                 }
 
                 // יצירת דיבור רובוטי מונוטוני מהיר
-                const monotonicInstructionAdmin = `Say monotonically, neutrally, flatly and slightly fast: ${transcribedTextForTts}`;
+                const monotonicInstructionAdmin = `slightly fast: ${transcribedTextForTts}`;
                 const finalTtsBuffer = await gemini.generateSpeech(monotonicInstructionAdmin, chosenVoiceId);
 
                 // העלאת הקובץ למיקום זמני לצורך סנכרון מהיר
