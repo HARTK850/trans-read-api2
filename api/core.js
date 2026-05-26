@@ -301,20 +301,28 @@ class GeminiManager {
     /**
      * STT חכם: מתמלל את האודיו שהתקבל מהטלפון
      */
+    /**
+     * STT חכם: מתמלל את האודיו ומזהה את הרגש וקצב הדיבור
+     */
     async transcribeAudioWithEmotion(audioBuffer) {
-        TelemetryLogger.info("GeminiManager", "transcribeAudio", "פתיחת תהליך תמלול");
+        TelemetryLogger.info("GeminiManager", "transcribeAudio", "פתיחת תהליך תמלול דינמי");
         const timer = TelemetryLogger.startTimer();
         
         const operation = async () => {
             const base64Audio = audioBuffer.toString('base64');
-            // קיבוע קשיח למודל המבוקש בלבד!
+            // המודל נשאר בדיוק אותו דבר!
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${this._getRotateKey()}`;
             const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
-            const prompt = `תמלל במדויק מילה במילה את מה שנאמר בהקלטה זו. אל תוסיף מילים משלך, אל תתקן דקדוקית, ואל תרשום שום דבר פרט לתמלול הנקי (בלי כוכביות, בלי סוגריים). הטקסט שתומלל:`;
+            
+            // פרומפט מורחב לניתוח טון הדיבור והטמעת הוראות בסוגריים
+            const prompt = `תמלל במדויק מילה במילה את מה שנאמר בהקלטה זו.
+בנוסף, נתח את סגנון הדיבור, קצב הדיבור, הרגש, האינטונציה ומשחקי הקול של הדובר בכל קטע או משפט.
+לפני כל משפט (או קטע משמעותי), הוסף סוגריים עגולות ( ) ובתוכן הוראה קצרה באנגלית למנוע הקראה (TTS) שמסבירה איך להקריא את המשפט הבא כדי שישמע בדיוק כמו המקור (לדוגמה: כועס, שמח, מהיר, איטי, לוחש, מדגיש מילים מסוימות).
+אל תוסיף שום תג אחר או כוכביות, רק את התמלול והסוגריים עם ההוראות באנגלית.`;
             
             const postData = JSON.stringify({
                 contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: "audio/wav", data: base64Audio } } ] }],
-                generationConfig: { temperature: 0.0 }
+                generationConfig: { temperature: 0.1 } // הרמת טמפרטורה קלה ליצירתיות בניתוח הקול
             });
             const response = await HttpClient.request(url, options, postData);
             return JSON.parse(response.body.toString('utf8'));
@@ -324,6 +332,7 @@ class GeminiManager {
         TelemetryLogger.endTimer("GeminiManager", "transcribeAudio", timer);
         
         if (result && result.candidates && result.candidates[0].content.parts[0].text) {
+            // מסירים רק כוכביות כפולות ומחזירים את הטקסט עם הסוגריים
             return result.candidates[0].content.parts[0].text.trim().replace(/\*\*/g, "");
         }
         throw new GeminiApiError("Gemini returned an invalid STT response.", 200, JSON.stringify(result));
@@ -332,31 +341,33 @@ class GeminiManager {
     /**
      * TTS מולטימודלי באמצעות Gemini Native Audio
      */
+    /**
+     * TTS מולטימודלי המקשיב להוראות שבתוך סוגריים
+     */
+    /**
+     * TTS מולטימודלי המקשיב להוראות שבתוך סוגריים
+     */
     async generateSpeech(text, voiceName) {
-        TelemetryLogger.info("GeminiManager", "generateSpeech", `מייצר דיבור באמצעות Gemini Audio, קול: ${voiceName}`);
+        TelemetryLogger.info("GeminiManager", "generateSpeech", `מייצר דיבור דינמי באמצעות Gemini Audio, קול: ${voiceName}`);
         const timer = TelemetryLogger.startTimer();
         
         const operation = async () => {
-            // קיבוע קשיח למודל ההקראה הייעודי המבוקש בלבד!
+            // המודל נשאר בדיוק אותו דבר!
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this._getRotateKey()}`;
             const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
             
             const postData = JSON.stringify({
                 contents: [{
-    parts: [{
-        text:
-`הקרא את הטקסט הבא בעברית בצורה אחידה ועניינית.
-שמור על טון דיבור יציב לאורך כל ההקראה.
-אל תביע רגשות.
-אל תדגיש מילים.
-אל תשנה אינטונציה במהלך המשפטים.
-שמור על קצב דיבור קבוע וטבעי.
-קרא את כל המשפטים באותו סגנון דיבור בדיוק.
-שמור על מהירות מעט גבוהה, אבל מובנת. לא כמו דיבור אנושי, אלא ממש קצת יותר מכך.
+                    parts: [{
+                        text: `קרא את הטקסט הבא בעברית.
+שים לב היטב! הטקסט מכיל הנחיות וסגנונות דיבור בתוך סוגריים עגולות, כגון (sad), (excited and fast), (whispering) וכדומה.
+1. שנה את טון הדיבור, הרגש, הקצב והאינטונציה שלך בהתאם להנחיה שבתוך הסוגריים החל מאותו רגע ועד לסוגריים הבאים.
+2. חוק חמור: אל תקריא בשום אופן את המילים שבתוך הסוגריים עצמן! התעלם מהן לחלוטין בזמן ההקראה הקולית, הן משמשות כהוראות בימוי בלבד עבורך.
 
+הטקסט להקראה:
 ${text}`
-    }]
-}],
+                    }]
+                }],
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     speechConfig: {
